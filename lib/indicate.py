@@ -7,7 +7,7 @@ Copyright 2021 J. Silverstone
 
 """
 
-import time
+import time, sys, os
 from PIL import Image
 
 import unicornhathd as uhd
@@ -19,9 +19,17 @@ class Indicator:
 	
 	def __init__(self, brightness=0.5):
 		
+		# Add indicate.py directory to PATH
+		self.bm_dir = os.path.join(
+					os.path.dirname(os.path.realpath(__file__)), "glyphs")
+		
+		self.state_ = ""
 		self.state = "ready"
 		
 		self.width, self.height = uhd.get_shape()
+		
+		self.img_seq = 0 # Index of image in stacked sequence
+		self.n_seq = int(self.img.size[0] / self.width)
 		
 		self.last_update_t = time.time()
 		
@@ -35,9 +43,11 @@ class Indicator:
 	@state.setter
 	def state(self, new_state):
 		if new_state != self.state_:
-			self.img = Image.open("bm_"+new_state+".png")
+			self.img = Image.open(
+						os.path.join(self.bm_dir,"bm_"+new_state+".png"))
 			self.state_ = new_state
-			self.update_period = 0.5
+			self.update_period = 0.2
+			self.img_seq = 0
 		
 
 	def tick(self):
@@ -47,20 +57,19 @@ class Indicator:
 		"""
 	
 		t = time.time()
-	
+		
 		if t - self.last_update_t > self.update_period:
-			for i in range(int(img.size[0] / width)):
-				for x in range(width):
-					for y in range(height):
-						pixel = img.getpixel(((i * width) + y, x))
-						r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
-						uhd.set_pixel(x, y, r, g, b)
+			self.last_update_t = t
+			
+			for x in range(self.width):
+				for y in range(self.height):
+					pixel = self.img.getpixel(((self.img_seq * self.width) + y, x))
+					r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
+					uhd.set_pixel(x, y, r, g, b)
 
-				uhd.show()
-
-except KeyboardInterrupt:
-	uhd.off()
-
-
-def tidy():
-	uhd.off()
+			uhd.show()
+			self.img_seq = (self.img_seq + 1) % self.n_seq
+		
+		
+	def __del__(self):
+		uhd.off()
